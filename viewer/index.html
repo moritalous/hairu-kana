@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>入るかな — Markdown ページ数ビューアー</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-light.min.css">
+<style>
+  :root {
+    --bg: #f6f8fa;
+    --surface: #ffffff;
+    --border: #d0d7de;
+    --accent: #0969da;
+    --danger: #cf222e;
+    --text: #1f2328;
+    --muted: #656d76;
+    --radius: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  header h1 span {
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 13px;
+    margin-left: 6px;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+  }
+
+  .controls label {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .controls select {
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    height: calc(100vh - 49px);
+  }
+
+  .input-pane {
+    width: 40%;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .input-pane textarea {
+    flex: 1;
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 16px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    background: transparent;
+  }
+
+  .input-pane textarea::placeholder {
+    color: var(--muted);
+  }
+
+  .preview-pane {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .result-bar {
+    width: 100%;
+    max-width: 700px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 14px;
+  }
+
+  .result-bar .page-count {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 40px;
+    text-align: center;
+  }
+
+  .result-bar .page-count.zero { color: var(--muted); }
+
+  .result-bar .detail {
+    flex: 1;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .fill-bar-wrap { width: 100px; }
+
+  .fill-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 3px;
+    text-align: right;
+  }
+
+  .fill-bar {
+    height: 4px;
+    background: #e1e4e8;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .fill-bar-inner {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.2s;
+  }
+
+  .paper-wrap {
+    position: relative;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.12);
+    background: #fff;
+  }
+
+  .paper-content .markdown-body { padding: 0; }
+
+  .page-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 0;
+    border-top: 2px dashed var(--danger);
+    opacity: 0.7;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .page-line::after {
+    content: attr(data-label);
+    position: absolute;
+    right: 4px;
+    top: -16px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+
+  .placeholder-msg {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 16px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>入るかな<span>— Markdown ページ数ビューアー</span></h1>
+  <div class="controls">
+    <label for="paper-select">用紙サイズ:</label>
+    <select id="paper-select">
+      <option value="b5">B5 (182×257mm)</option>
+      <option value="a4" selected>A4 (210×297mm)</option>
+      <option value="a3">A3 (297×420mm)</option>
+    </select>
+  </div>
+</header>
+
+<div class="main">
+  <div class="input-pane">
+    <textarea id="md-input" placeholder="Markdownを入力してください…"></textarea>
+  </div>
+
+  <div class="preview-pane">
+    <div class="result-bar">
+      <div class="page-count zero" id="page-count">—</div>
+      <div class="detail" id="result-detail">Markdownを入力するとページ数を計測します</div>
+      <div class="fill-bar-wrap">
+        <div class="fill-label" id="fill-label">—</div>
+        <div class="fill-bar">
+          <div class="fill-bar-inner" id="fill-bar" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="paper-wrap" id="paper-wrap">
+      <div class="paper-content">
+        <div class="markdown-body" id="preview-body">
+          <p class="placeholder-msg">← Markdownを入力するとプレビューが表示されます</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.4/marked.min.js"></script>
+<script type="module">
+import { countPages } from '../dist/browser.mjs';
+
+const PAPER_PRESETS = {
+  b5: { width: 669, height: 945, marginH: 91, marginV: 91 },
+  a4: { width: 794, height: 1123, marginH: 120, marginV: 96 },
+  a3: { width: 1123, height: 1587, marginH: 120, marginV: 96 },
+};
+
+const mdInput = document.getElementById('md-input');
+const paperSelect = document.getElementById('paper-select');
+const pageCountEl = document.getElementById('page-count');
+const resultDetailEl = document.getElementById('result-detail');
+const fillLabelEl = document.getElementById('fill-label');
+const fillBarEl = document.getElementById('fill-bar');
+const paperWrap = document.getElementById('paper-wrap');
+const previewBody = document.getElementById('preview-body');
+
+let debounceTimer = null;
+
+function debounce(fn, ms) {
+  return (...args) => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+function renderPreview(markdown, paper) {
+  const preset = PAPER_PRESETS[paper];
+  const contentHeight = preset.height - 2 * preset.marginV;
+
+  // Set paper dimensions
+  paperWrap.style.width = preset.width + 'px';
+  previewBody.style.padding = preset.marginV + 'px ' + preset.marginH + 'px';
+
+  if (!markdown.trim()) {
+    previewBody.innerHTML =
+      '<p class="placeholder-msg">← Markdownを入力するとプレビューが表示されます</p>';
+    paperWrap.querySelectorAll('.page-line').forEach(el => el.remove());
+    return;
+  }
+
+  // Render markdown using marked (loaded via CDN)
+  previewBody.innerHTML = marked.parse(markdown, { gfm: true });
+
+  return contentHeight;
+}
+
+function drawPageLines(pages, contentHeight, marginV) {
+  paperWrap.querySelectorAll('.page-line').forEach(el => el.remove());
+  for (let i = 1; i < pages; i++) {
+    const line = document.createElement('div');
+    line.className = 'page-line';
+    line.style.top = (marginV + contentHeight * i) + 'px';
+    line.setAttribute('data-label', 'P.' + i + ' → P.' + (i + 1));
+    paperWrap.appendChild(line);
+  }
+}
+
+async function measure() {
+  const markdown = mdInput.value;
+  const paper = paperSelect.value;
+  const preset = PAPER_PRESETS[paper];
+  const contentHeight = preset.height - 2 * preset.marginV;
+
+  // Render preview
+  renderPreview(markdown, paper);
+
+  if (!markdown.trim()) {
+    pageCountEl.textContent = '—';
+    pageCountEl.className = 'page-count zero';
+    resultDetailEl.textContent = 'Markdownを入力するとページ数を計測します';
+    fillLabelEl.textContent = '—';
+    fillBarEl.style.width = '0%';
+    return;
+  }
+
+  try {
+    const result = await countPages(markdown, { paper });
+    const fillPct = Math.round(result.lastPageFill * 100);
+
+    pageCountEl.textContent = result.pages;
+    pageCountEl.className = 'page-count';
+    resultDetailEl.textContent =
+      result.pages + 'ページ（最終ページ ' + fillPct + '% 使用）';
+    fillLabelEl.textContent = fillPct + '%';
+    fillBarEl.style.width = fillPct + '%';
+
+    drawPageLines(result.pages, contentHeight, preset.marginV);
+  } catch (err) {
+    resultDetailEl.textContent = 'エラー: ' + err.message;
+  }
+}
+
+const debouncedMeasure = debounce(measure, 300);
+
+mdInput.addEventListener('input', debouncedMeasure);
+paperSelect.addEventListener('change', measure);
+
+// Set initial paper dimensions
+const initPreset = PAPER_PRESETS[paperSelect.value];
+paperWrap.style.width = initPreset.width + 'px';
+previewBody.style.padding = initPreset.marginV + 'px ' + initPreset.marginH + 'px';
+</script>
+
+</body>
+</html>
