@@ -1,0 +1,3 @@
+[test]
+# 統合テスト (integration.test.ts) は vitest で実行するため bun test から除外
+pathIgnorePatterns = ["**/integration.test.ts"]

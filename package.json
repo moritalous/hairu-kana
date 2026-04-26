@@ -1,0 +1,33 @@
+{
+	"name": "hairu-kana",
+	"version": "0.1.0",
+	"description": "入るかな — Markdownドキュメントのページ数を計測するライブラリ",
+	"scripts": {
+		"build": "bun run build.ts",
+		"test": "bun test",
+		"test:integration": "vitest run",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write .",
+		"check": "biome check --write . && bun test"
+	},
+	"exports": {
+		".": {
+			"browser": "./dist/browser.mjs",
+			"import": "./dist/node.mjs",
+			"require": "./dist/node.cjs"
+		}
+	},
+	"bin": {
+		"hairu-kana": "./dist/cli.mjs"
+	},
+	"dependencies": {
+		"github-markdown-css": "^5.8.1",
+		"marked": "^15.0.0",
+		"playwright-core": "^1.49.0"
+	},
+	"devDependencies": {
+		"fast-check": "^3.0.0",
+		"vitest": "^2.0.0"
+	}
+}

@@ -1,0 +1,22 @@
+{
+	"files": {
+		"ignore": ["dist/**", "node_modules/**"]
+	},
+	"organizeImports": {
+		"enabled": true
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 80
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"suspicious": {
+				"noExplicitAny": "off"
+			}
+		}
+	}
+}
