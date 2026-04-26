@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Markdown ページ数チェッカー</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: rgba(255,255,255,0.08);
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --warn: #f0883e;
+    --danger: #f85149;
+    --text: #e6edf3;
+    --muted: #7d8590;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ===== 左パネル ===== */
+  .left {
+    width: 400px;
+    min-width: 400px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+  }
+
+  .left-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .left-header h1 { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; }
+  .left-header p  { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* ===== プリセットセクション ===== */
+  .presets {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .preset-group {}
+  .preset-group-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 7px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .preset-btns {
+    display: flex;
+    gap: 6px;
+  }
+
+  .preset-btn {
+    flex: 1;
+    padding: 8px 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    line-height: 1.2;
+  }
+
+  .preset-btn .label { font-weight: 700; color: var(--text); font-size: 12px; }
+  .preset-btn .sub   { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  .preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(88,166,255,0.06);
+  }
+  .preset-btn:hover .label { color: var(--accent); }
+
+  .preset-btn.active {
+    border-color: var(--accent);
+    background: rgba(88,166,255,0.12);
+  }
+  .preset-btn.active .label { color: var(--accent); }
+  .preset-btn.active .sub   { color: var(--accent); opacity: 0.7; }
+
+  /* 用紙サイズは色を変える */
+  .paper-btn:hover,
+  .paper-btn.active {
+    border-color: var(--accent2);
+    background: rgba(63,185,80,0.1);
+  }
+  .paper-btn:hover .label,
+  .paper-btn.active .label { color: var(--accent2); }
+  .paper-btn:hover .sub,
+  .paper-btn.active .sub   { color: var(--accent2); opacity: 0.7; }
+
+  /* ===== テキストエリア ===== */
+  .editor-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 20px;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .samples { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sample-btn {
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .sample-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  textarea {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    padding: 14px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+
+  .action-bar {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 9px;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #0d1117; }
+  .btn-primary:hover { background: #79c0ff; }
+  .btn-ghost { background: rgba(255,255,255,0.06); color: var(--text); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+
+  /* ===== 右エリア ===== */
+  .right {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    background: #13151a;
+  }
+
+  /* ===== 結果バナー ===== */
+  .result-banner {
+    width: 100%;
+    max-width: 794px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .page-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--accent2);
+    min-width: 56px;
+  }
+  .page-num.warn   { color: var(--warn); }
+  .page-num.danger { color: var(--danger); }
+
+  .banner-info { flex: 1; }
+  .banner-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .banner-sub   { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  .progress-wrap { width: 120px; }
+  .progress-label {
+    font-size: 10px; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 5px;
+    display: flex; justify-content: space-between;
+  }
+  .progress-bar  { height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s, background 0.3s; }
+
+  /* ===== A4プレビュー ===== */
+  .a4-wrap {
+    position: relative;
+  }
+
+  .a4-paper {
+    background: #fff;
+    color: #1a1a1a;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.6);
+    position: relative;
+  }
+
+  .page-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 0;
+    border-top: 2px dashed var(--danger);
+    opacity: 0.8;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .page-line::before {
+    content: attr(data-p);
+    position: absolute;
+    right: 0;
+    top: -10px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 1px 6px;
+    border-radius: 3px 3px 0 0;
+  }
+
+  /* Markdownスタイル（A4内） */
+  .md-body h1 { font-size: 1.5em; font-weight: 700; margin: 0 0 0.6em; border-bottom: 2px solid #e1e4e8; padding-bottom: 0.3em; color: #111; }
+  .md-body h2 { font-size: 1.25em; font-weight: 700; margin: 1.2em 0 0.5em; color: #222; }
+  .md-body h3 { font-size: 1.05em; font-weight: 700; margin: 1em 0 0.4em; color: #333; }
+  .md-body p  { margin: 0 0 0.7em; color: #333; }
+  .md-body ul, .md-body ol { margin: 0 0 0.7em 1.4em; color: #333; }
+  .md-body li { margin-bottom: 0.25em; }
+  .md-body blockquote { border-left: 3px solid #58a6ff; margin: 0.8em 0; padding: 0.5em 1em; background: #f6f8fa; color: #555; }
+  .md-body code { background: #f0f2f4; border-radius: 3px; padding: 1px 5px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; color: #e36209; }
+  .md-body pre { background: #f6f8fa; border-radius: 6px; padding: 0.9em 1em; margin: 0.8em 0; overflow-x: auto; }
+  .md-body pre code { background: none; padding: 0; font-size: 0.85em; color: #24292e; }
+  .md-body table { width: 100%; border-collapse: collapse; margin: 0.8em 0; font-size: 0.9em; }
+  .md-body th { background: #f0f2f4; padding: 0.5em 0.75em; border: 1px solid #d0d7de; font-weight: 700; }
+  .md-body td { padding: 0.45em 0.75em; border: 1px solid #d0d7de; }
+  .md-body hr { border: none; border-top: 1px solid #d0d7de; margin: 1em 0; }
+  .md-body strong { font-weight: 700; color: #111; }
+
+  /* 測定用（不可視） */
+  #measure-div {
+    position: fixed;
+    visibility: hidden;
+    pointer-events: none;
+    top: -99999px;
+    left: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== 左パネル ===== -->
+<div class="left">
+  <div class="left-header">
+    <h1>Markdown Page Counter</h1>
+    <p>Wordベースのプリセットでページ数を計測</p>
+  </div>
+
+  <div class="presets">
+
+    <!-- 用紙サイズ -->
+    <div class="preset-group">
+      <div class="preset-group-label">📄 用紙サイズ</div>
+      <div class="preset-btns" id="paper-btns">
+        <button class="preset-btn paper-btn" data-paper="b5" onclick="setPreset('paper','b5',this)">
+          <span class="label">B5</span>
+          <span class="sub">182×257mm</span>
+        </button>
+        <button class="preset-btn paper-btn active" data-paper="a4" onclick="setPreset('paper','a4',this)">
+          <span class="label">A4</span>
+          <span class="sub">210×297mm</span>
+        </button>
+        <button class="preset-btn paper-btn" data-paper="a3" onclick="setPreset('paper','a3',this)">
+          <span class="label">A3</span>
+          <span class="sub">297×420mm</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- フォントサイズ -->
+    <div class="preset-group">
+      <div class="preset-group-label">🔤 フォントサイズ</div>
+      <div class="preset-btns" id="font-btns">
+        <button class="preset-btn" data-font="small" onclick="setPreset('font','small',this)">
+          <span class="label">小さめ</span>
+          <span class="sub">10.5pt</span>
+        </button>
+        <button class="preset-btn active" data-font="normal" onclick="setPreset('font','normal',this)">
+          <span class="label">普通</span>
+          <span class="sub">11pt</span>
+        </button>
+        <button class="preset-btn" data-font="large" onclick="setPreset('font','large',this)">
+          <span class="label">大きめ</span>
+          <span class="sub">12pt</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 行間 -->
+    <div class="preset-group">
+      <div class="preset-group-label">↕️ 行間</div>
+      <div class="preset-btns" id="lh-btns">
+        <button class="preset-btn" data-lh="narrow" onclick="setPreset('lh','narrow',this)">
+          <span class="label">せまめ</span>
+          <span class="sub">1.15</span>
+        </button>
+        <button class="preset-btn active" data-lh="normal" onclick="setPreset('lh','normal',this)">
+          <span class="label">普通</span>
+          <span class="sub">1.5</span>
+        </button>
+        <button class="preset-btn" data-lh="wide" onclick="setPreset('lh','wide',this)">
+          <span class="label">ひろめ</span>
+          <span class="sub">1.7</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- エディタ -->
+  <div class="editor-wrap">
+    <div class="samples">
+      <button class="sample-btn" onclick="loadSample('simple')">シンプル</button>
+      <button class="sample-btn" onclick="loadSample('report')">レポート</button>
+      <button class="sample-btn" onclick="loadSample('dense')">情報密度高</button>
+    </div>
+    <textarea id="md-input" placeholder="# Markdownを入力..." oninput="update()"></textarea>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" onclick="update()">📐 ページ数を計測</button>
+    <button class="btn btn-ghost" onclick="document.getElementById('md-input').value='';update()">クリア</button>
+  </div>
+</div>
+
+<!-- ===== 右エリア ===== -->
+<div class="right">
+  <div class="result-banner">
+    <div class="page-num" id="page-num">—</div>
+    <div class="banner-info">
+      <div class="banner-title" id="banner-title">Markdownを入力してください</div>
+      <div class="banner-sub" id="banner-sub">—</div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>最終ページ</span>
+        <span id="progress-pct">—</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width:0%;background:var(--accent2)"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="a4-wrap" id="a4-wrap">
+    <div class="a4-paper" id="a4-paper">
+      <div id="a4-body" class="md-body">
+        <p style="color:#aaa;font-size:12px;">← Markdownを入力するとここにレンダリングされます</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 測定用div -->
+<div id="measure-div" class="md-body"></div>
+
+<script>
+  // ===== プリセット定義（Wordベース）=====
+  const PRESETS = {
+    paper: {
+      b5: { w: 669,  h: 945,  marginH: 91,  marginV: 91,  label: 'B5' },
+      a4: { w: 794,  h: 1123, marginH: 120, marginV: 96,  label: 'A4' },
+      a3: { w: 1123, h: 1587, marginH: 120, marginV: 96,  label: 'A3' },
+    },
+    font: {
+      small:  { px: 14,   label: '10.5pt' },
+      normal: { px: 14.7, label: '11pt'   },
+      large:  { px: 16,   label: '12pt'   },
+    },
+    lh: {
+      narrow: { val: 1.15, label: 'せまめ' },
+      normal: { val: 1.5,  label: '普通'   },
+      wide:   { val: 1.7,  label: 'ひろめ' },
+    }
+  };
+
+  // 現在の選択状態
+  let current = { paper: 'a4', font: 'normal', lh: 'normal' };
+
+  function setPreset(type, key, el) {
+    current[type] = key;
+    // ボタンのactive更新
+    el.closest('.preset-btns').querySelectorAll('.preset-btn')
+      .forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    update();
+  }
+
+  function update() {
+    const md = document.getElementById('md-input').value;
+    const paper = PRESETS.paper[current.paper];
+    const font  = PRESETS.font[current.font];
+    const lh    = PRESETS.lh[current.lh];
+
+    const contentW = paper.w - paper.marginH * 2;
+    const contentH = paper.h - paper.marginV * 2;
+
+    const html = marked.parse(md || '');
+
+    // 測定用divにスタイル適用
+    const mDiv = document.getElementById('measure-div');
+    mDiv.style.width      = contentW + 'px';
+    mDiv.style.fontSize   = font.px + 'px';
+    mDiv.style.lineHeight = lh.val;
+    mDiv.innerHTML = html;
+
+    requestAnimationFrame(() => {
+      const renderH = mDiv.scrollHeight;
+      const pages   = md.trim() ? Math.ceil(renderH / contentH) : 0;
+      const lastFill = md.trim()
+        ? ((renderH % contentH) / contentH * 100) || 100
+        : 0;
+
+      const color = pages >= 4 ? 'var(--danger)' : pages >= 2 ? 'var(--warn)' : 'var(--accent2)';
+      const cls   = pages >= 4 ? 'danger' : pages >= 2 ? 'warn' : '';
+
+      // バナー
+      const pn = document.getElementById('page-num');
+      pn.textContent = pages || '—';
+      pn.className = 'page-num ' + cls;
+
+      document.getElementById('banner-title').textContent = pages
+        ? `${paper.label} で ${pages} ページ（${font.label} / 行間${lh.val}）`
+        : 'Markdownを入力してください';
+      document.getElementById('banner-sub').textContent = pages
+        ? `renderHeight: ${renderH}px ÷ contentHeight: ${contentH}px`
+        : '—';
+
+      const pct = Math.round(lastFill);
+      document.getElementById('progress-pct').textContent = pct + '%';
+      const fill = document.getElementById('progress-fill');
+      fill.style.width      = pct + '%';
+      fill.style.background = color;
+
+      // A4プレビュー
+      const paperEl = document.getElementById('a4-paper');
+      paperEl.style.width   = paper.w + 'px';
+      paperEl.style.padding = `${paper.marginV}px ${paper.marginH}px`;
+
+      const body = document.getElementById('a4-body');
+      body.style.fontSize   = font.px + 'px';
+      body.style.lineHeight = lh.val;
+      body.innerHTML = html || '<p style="color:#aaa;font-size:12px;">← Markdownを入力するとここにレンダリングされます</p>';
+
+      // ページ区切り線
+      const wrap = document.getElementById('a4-wrap');
+      wrap.style.width = paper.w + 'px';
+      wrap.querySelectorAll('.page-line').forEach(e => e.remove());
+      for (let i = 1; i < pages; i++) {
+        const line = document.createElement('div');
+        line.className = 'page-line';
+        line.style.top = (paper.marginV + contentH * i) + 'px';
+        line.setAttribute('data-p', `P.${i} → P.${i + 1}`);
+        wrap.appendChild(line);
+      }
+    });
+  }
+
+  // ===== サンプルテキスト =====
+  const SAMPLES = {
+    simple: `# はじめに\n\nこれはシンプルなMarkdownのサンプルです。\n\n## 主な特徴\n\n- **シンプルな構造**：見出しと箇条書きのみ\n- **短いテキスト**：1ページに収まる量\n- **基本的な書式**：太字と斜体\n\n## まとめ\n\nA4の*1ページ以内*に収まることを確認できます。`,
+
+    report: `# 生成AI業務活用レポート\n\n## エグゼクティブサマリー\n\n本レポートは、2024年度における生成AIの業務活用状況を分析し、今後の導入戦略について提言するものです。\n\n## 1. 調査結果\n\n### 1.1 導入率の推移\n\n| 部門 | 2023年 | 2024年 | 増加率 |\n|---|---|---|---|\n| マーケティング | 28% | 71% | +154% |\n| エンジニア | 45% | 88% | +96% |\n| サポート | 19% | 52% | +174% |\n| 人事・採用 | 12% | 38% | +217% |\n\n### 1.2 主な活用用途\n\n1. **文書生成・編集**（87%）\n2. **コード生成・レビュー**（76%）\n3. **データ分析・要約**（68%）\n4. **翻訳・多言語対応**（54%）\n\n## 2. 課題と懸念\n\n> 「精度の不安定さ」と「情報セキュリティ」が導入障壁の上位項目です。\n\n- ハルシネーション：誤情報の生成リスク（79%が懸念）\n- 機密情報の漏洩リスク\n- 著作権・倫理問題\n- スキル依存による人材育成への影響\n\n## 3. 推奨アクション\n\n### 短期（0〜6ヶ月）\n\nパイロット部門の選定と実証実験の開始、利用ガイドラインの策定、社内教育プログラムの設計を進めます。\n\n### 中長期（6ヶ月〜2年）\n\n全社展開に向けたインフラ整備と、AI活用を前提とした業務プロセスの再設計を推進します。`,
+
+    dense: `# 技術仕様書 v2.4\n\n## システムアーキテクチャ\n\nマイクロサービスアーキテクチャを採用し、各サービスはDockerコンテナとしてKubernetes上にデプロイされます。\n\n## API仕様\n\n| Method | Path | 認証 | 説明 |\n|---|---|---|---|\n| GET | /api/v1/documents | Bearer | 一覧取得 |\n| POST | /api/v1/documents | Bearer | 作成 |\n| PUT | /api/v1/documents/:id | Bearer | 更新 |\n| DELETE | /api/v1/documents/:id | Admin | 削除 |\n\n### リクエスト例\n\n\`\`\`json\n{\n  "model": "claude-sonnet",\n  "messages": [{ "role": "user", "content": "..." }],\n  "max_tokens": 1000\n}\n\`\`\`\n\n## パフォーマンス要件\n\n- **レスポンスタイム**：p95 < 200ms\n- **スループット**：1,000 req/sec\n- **可用性**：99.9%\n- **データ保持**：ログ90日、ユーザーデータ7年\n\n## セキュリティ要件\n\n### 認証・認可\n\n全APIはJWT（RS256署名）による認証が必須です。トークン有効期限は1時間。\n\n### 暗号化\n\n- 通信：TLS 1.3以上を強制\n- 保存データ：AES-256-GCM\n- パスワード：bcrypt（コスト係数12以上）\n\n## 監視・アラート\n\n\`\`\`yaml\nalerts:\n  - name: HighErrorRate\n    condition: error_rate > 1%\n    severity: critical\n  - name: SlowResponse\n    condition: p95_latency > 500ms\n    severity: warning\n\`\`\`\n\n---\n\n**更新履歴**：v2.4（2024-12）AI解析エンドポイント追加`
+  };
+
+  function loadSample(key) {
+    document.getElementById('md-input').value = SAMPLES[key];
+    update();
+  }
+
+  update();
+</script>
+</body>
+</html>
